@@ -1,0 +1,45 @@
+
+services:
+  postgres:
+    build: ./docker/postgres
+    container_name: aw_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U postgres -d dw_adventureworks"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  airflow:
+    build: ./docker/airflow
+    container_name: aw_airflow
+    command: standalone
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres:5432/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"   # ambiente acadêmico: UI sem login
+      AIRFLOW_CONN_AW_ORIGEM: postgresql://postgres:postgres@postgres:5432/Adventureworks
+      AIRFLOW_CONN_DW_POSTGRES: postgresql://postgres:postgres@postgres:5432/dw_adventureworks
+      DW_SQL_DIR: /opt/airflow/sql
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./sql:/opt/airflow/sql
+      - airflow_logs:/opt/airflow/logs
+
+volumes:
+  pgdata:
+  airflow_logs:
